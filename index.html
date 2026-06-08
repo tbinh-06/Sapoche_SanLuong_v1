@@ -69,12 +69,20 @@
     <div class="ttl">Báo cáo sản lượng — Sapoche<small id="liveBadge">LIVE</small></div>
     <div class="sub">
       <span id="upd"></span>
+      <button class="btn" onclick="showConfig(resolveUrl())">⚙ Đổi URL</button>
       <button class="btn" id="reloadBtn" onclick="loadData()">↻ Tải lại</button>
     </div>
   </div>
 
   <div id="loading"><div class="spin"></div><div style="margin-top:12px">Đang tải dữ liệu từ Google Sheet…</div></div>
   <div id="errbox"></div>
+
+  <div id="cfg" style="display:none;max-width:580px;margin:40px auto;background:#fff;border:.5px solid var(--border);border-radius:12px;padding:26px 28px">
+    <div class="sl">Kết nối Google Sheet</div>
+    <p style="font-size:13px;color:var(--txt2);margin:0 0 14px">Dán URL Apps Script (kết thúc bằng <b>/exec</b>) rồi bấm Tải. URL sẽ được nhớ trên trình duyệt này, lần sau không phải nhập lại.</p>
+    <input id="cfgUrl" type="text" placeholder="https://script.google.com/macros/s/.../exec" style="width:100%;padding:11px 13px;border:.5px solid var(--blue-l);border-radius:8px;font-size:13px;margin-bottom:14px">
+    <button class="btn" style="background:var(--blue);color:#fff;border-color:var(--blue)" onclick="saveAndLoad()">Lưu &amp; tải dashboard</button>
+  </div>
 
   <div id="app">
     <div class="fr">
@@ -147,13 +155,28 @@ function wname(h){ h=String(h||"").replace(/^@/,"").trim(); return NAME_MAP[h]||
 function dkey(d){ var m=String(d||"").match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/); return m?(m[3]+m[2].padStart(2,"0")+m[1].padStart(2,"0")):"";}
 
 /* ---- tải dữ liệu ---- */
-function loadData(){
-  ge("loading").style.display="block"; ge("app").style.display="none"; ge("errbox").style.display="none";
+function getStored(){ try{ return localStorage.getItem("sapoche_api_url"); }catch(e){ return null; } }
+function setStored(v){ try{ localStorage.setItem("sapoche_api_url", v); }catch(e){} }
+function resolveUrl(){
   var q = new URLSearchParams(location.search).get("src");
-  var base = (q || API_URL).trim();
-  if(!base || base.indexOf("PASTE_") === 0){
-    return showErr("Chưa cấu hình API_URL. Mở file, dán URL Apps Script /exec vào dòng API_URL (hoặc thêm ?src=URL vào địa chỉ).");
-  }
+  if(q) return q.trim();
+  var st = getStored(); if(st) return st.trim();
+  if(API_URL && API_URL.indexOf("PASTE_") !== 0) return API_URL.trim();
+  return "";
+}
+function showConfig(prefill){
+  ge("loading").style.display="none"; ge("app").style.display="none"; ge("errbox").style.display="none";
+  ge("cfg").style.display="block"; if(prefill) ge("cfgUrl").value=prefill; ge("cfgUrl").focus();
+}
+function saveAndLoad(){
+  var v = ge("cfgUrl").value.trim();
+  if(!v){ ge("cfgUrl").focus(); return; }
+  setStored(v); ge("cfg").style.display="none"; loadData();
+}
+function loadData(){
+  ge("loading").style.display="block"; ge("app").style.display="none"; ge("errbox").style.display="none"; ge("cfg").style.display="none";
+  var base = resolveUrl();
+  if(!base){ return showConfig(""); }
   var url = base + (base.indexOf("?")>=0 ? "&" : "?") + "api=data&t=" + Date.now();
   fetch(url).then(function(r){ return r.json(); }).then(function(j){
     if(!j || !j.ok){ throw new Error(j && j.error ? j.error : "Phản hồi không hợp lệ"); }
@@ -167,8 +190,9 @@ function loadData(){
       "(3) mở thử URL ...exec?api=data trên trình duyệt xem có ra JSON không.");
   });
 }
-function showErr(html){ ge("loading").style.display="none"; ge("app").style.display="none";
-  var e=ge("errbox"); e.style.display="block"; e.innerHTML=html; }
+function showErr(html){ ge("loading").style.display="none"; ge("app").style.display="none"; ge("cfg").style.display="none";
+  var e=ge("errbox"); e.style.display="block";
+  e.innerHTML=html + '<br><br><button class="btn" onclick="showConfig(resolveUrl())">⚙ Nhập / đổi URL</button>'; }
 
 function normalize(row){
   var kh = Number(row["Dây"]) || 0;
