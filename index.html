@@ -109,7 +109,7 @@ body{font-family:var(--font-sans);font-size:14px;color:var(--color-text-primary)
 #livebar button{font-size:11.5px;padding:4px 9px;border:.5px solid #85B7EB;background:#fff;color:#185FA5;border-radius:6px;cursor:pointer}
 </style>
 <div id="boot"><div style="text-align:center;color:#6b6b6b"><div class="bspin"></div><div style="margin-top:12px">Đang tải…</div></div></div>
-<div id="livebar"><span id="upd"></span><button onclick="loadData()">↻ Tải lại</button><button onclick="_showCfg(_resolveUrl())">⚙</button></div>
+<div id="livebar"><span id="upd"></span><button onclick="loadData()">↻ Tải lại</button></div>
 <div class="tb"><div class="tb-r"><div class="tb-l"><span class="ptitle">Báo cáo sản lượng — Sapoche</span><span class="chip ck-blue" id="periodChip">02 – 08/06/2026</span></div><span class="wlabel">10 tickets · 5 công nhân</span></div></div>
 <div class="nav"><button class="nb on" onclick="goView('ov',this)">Tổng quan</button><button class="nb" onclick="goView('dt',this)">Chi tiết sản lượng</button></div>
 <div id="metrics-box"></div>
@@ -476,35 +476,36 @@ function initDates(){var o="";DAYS.forEach(function(d){o+='<option>'+d+'</option
 var API_URL = "https://script.google.com/macros/s/AKfycbyRKVRTcyyDdEnsAV8gIkRbQLtRy3yhQ7pGN36vQRxtUFjch9CWR25Ev64qUxDy_w0q5Q/exec";
 var NAME_MAP = {"phuonganh":"Nguyễn Phương Anh","thanhtu":"Lê Thanh Tú","minhduong":"Trần Minh Dương","bichngoc":"Trần Bích Ngọc","BaseSupport":"BaseSupport"};
 
-function _dkey(d){var m=String(d||"").match(/(\d{1,2})\/(\d{1,2})/);return m?(("0"+m[1]).slice(-2)+"/"+("0"+m[2]).slice(-2)):"";}
-function _full(d){var m=String(d||"").match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);return m?new Date(+m[3],+m[2]-1,+m[1]):null;}
-
-
-
-
-
-
-function _short(w){var h=w.replace(/^@/,"");var nm=NAME_MAP[h];if(nm&&nm.indexOf(" ")>0){var ps=nm.split(" ");return (ps[0][0]+ps[ps.length-1][0]).toUpperCase();}return h.slice(0,2).toUpperCase();}
+function _full(d){
+  if(d instanceof Date) return d;
+  var s=String(d||"").trim(); if(!s) return null;
+  var m=s.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/); if(m) return new Date(+m[3],+m[2]-1,+m[1]);
+  var t=Date.parse(s); if(!isNaN(t)) return new Date(t);
+  return null;
+}
+function _dkey(d){ var f=_full(d); return f?(("0"+f.getDate()).slice(-2)+"/"+("0"+(f.getMonth()+1)).slice(-2)):""; }
+function _short(w){ var h=w.replace(/^@/,""); var nm=NAME_MAP[h]; if(nm&&nm.indexOf(" ")>0){var ps=nm.split(" ");return (ps[0][0]+ps[ps.length-1][0]).toUpperCase();} return h.slice(0,2).toUpperCase(); }
 
 function buildModel(rows){
   var its = rows.map(function(r){
-    var kh = Number(r["Dây"]) || 0; var rawtt = r["Sản lượng hoàn thành"];
-    var tt = (rawtt===""||rawtt===null||rawtt===undefined) ? null : (Number(rawtt)||0);
-    return { maPhieu:String(r["Mã phiếu"]||"").trim(), maDon:String(r["Mã đơn hàng"]||"").trim()||"(không rõ)",
-      dateF:String(r["Ngày thực hiện"]||"").trim(), endF:String(r["Ngày kết thúc"]||"").trim(),
-      cong:String(r["Độ cong"]||"").trim(), dai:String(r["Độ dài (mm)"]||"").trim(),
-      worker:"@"+String(r["Công nhân phụ trách"]||"").replace(/^@/,"").trim(), kh:kh, tt:tt };
-  }).filter(function(x){ return x.maPhieu; });
-
-
+    try{
+      var kh = Number(r["Dây"]) || 0; var rawtt = r["Sản lượng hoàn thành"];
+      var tt = (rawtt===""||rawtt===null||rawtt===undefined) ? null : (Number(rawtt)||0);
+      return { maPhieu:String(r["Mã phiếu"]||"").trim(), maDon:String(r["Mã đơn hàng"]||"").trim()||"(không rõ)",
+        dateF:r["Ngày thực hiện"], endF:r["Ngày kết thúc"],
+        cong:String(r["Độ cong"]||"").trim(), dai:String(r["Độ dài (mm)"]||"").trim(),
+        worker:"@"+String(r["Công nhân phụ trách"]||"").replace(/^@/,"").trim(), kh:kh, tt:tt };
+    }catch(e){ return null; }
+  }).filter(function(x){ return x && x.maPhieu; });
 
   LOAI = []; var loaiIdx = {};
   its.forEach(function(i){ var k=i.cong+"|"+i.dai; if(!(k in loaiIdx)){ loaiIdx[k]=LOAI.length; LOAI.push([i.cong,i.dai]); } });
 
   var dset={}, fmap={};
   its.forEach(function(i){ var k=_dkey(i.dateF); if(k){dset[k]=1; fmap[k]=_full(i.dateF);}
-    if(i.endF){var ek=_dkey(i.endF); if(ek){dset[ek]=1; fmap[ek]=_full(i.endF);}} });
+    var ek=_dkey(i.endF); if(ek){dset[ek]=1; fmap[ek]=_full(i.endF);} });
   GDATES = Object.keys(dset).sort(function(a,b){ return (fmap[a]||0)-(fmap[b]||0); });
+  if(!GDATES.length) GDATES=[""];
   DAYS = GDATES.slice();
   DAYIDX = {}; GDATES.forEach(function(k,idx){ DAYIDX[k]=idx; });
   var now=new Date(); TODAY_IDX = Math.max(0, GDATES.length-1);
@@ -520,7 +521,7 @@ function buildModel(rows){
       DONS[i.maPhieu]=i.maDon; MAKH[i.maPhieu]=(i.maDon.split(/[\s\-]/)[0]||i.maDon); }
     var ti=tinfo[i.maPhieu]; var dk=_dkey(i.dateF);
     if(dk && (ti.start===null || (fmap[dk]&&fmap[ti.start]&&fmap[dk]<fmap[ti.start]))) ti.start=dk;
-    if(i.endF){ var ek=_dkey(i.endF); if(ek) ti.end=ek; }
+    var ek=_dkey(i.endF); if(ek) ti.end=ek;
     ti.kh+=i.kh; if(i.tt!==null){ ti.tt+=i.tt; ti.has=true; }
   });
   DON2TID={}; for(var dd in DONS) DON2TID[DONS[dd]]=dd;
@@ -546,7 +547,6 @@ function buildModel(rows){
     return { id:w, short:SHORTS[w], kh:kh, tt:tt, items:rws.length, done:done, name:NAMES[w] };
   });
 
-  // metrics trang Chi tiết (tính lại từ live)
   var byW = WORKERS_DEF.map(function(w){ return {name:w.name, pct:w.kh>0?Math.round(w.tt/w.kh*100):0, kh:w.kh}; });
   var hi = byW.slice().sort(function(a,b){return b.pct-a.pct;})[0];
   var lo = byW.slice().sort(function(a,b){return a.pct-b.pct;})[0];
@@ -580,29 +580,25 @@ function initDashboard(){
   setTimeout(function(){ drawDay(ovFiltered()); drawDonut(ovFiltered()); }, 150);
 }
 
-/* ---- loader + cấu hình URL trên trang ---- */
-function _getStored(){ try{ return localStorage.getItem("sapoche_api_url"); }catch(e){ return null; } }
-function _setStored(v){ try{ localStorage.setItem("sapoche_api_url", v); }catch(e){} }
-function _resolveUrl(){ var q=new URLSearchParams(location.search).get("src"); if(q) return q.trim();
-  var st=_getStored(); if(st) return st.trim(); if(API_URL && API_URL.indexOf("PASTE_")!==0) return API_URL.trim(); return ""; }
-
+/* ---- loader (URL gắn cứng, không cần nhập) ---- */
 function _boot(html){ var b=ge("boot"); if(b){ b.style.display="flex"; b.innerHTML=html; } }
-function _showCfg(pref){ _boot('<div style="background:#fff;border:.5px solid #E2E2DC;border-radius:12px;padding:26px 28px;max-width:560px"><div style="font-size:12px;font-weight:600;color:#185FA5;text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">Kết nối Google Sheet</div><div style="font-size:13px;color:#6b6b6b;margin-bottom:14px">Dán URL Apps Script (kết thúc bằng <b>/exec</b>) rồi bấm Tải. Trình duyệt sẽ nhớ cho lần sau.</div><input id="cfgUrl" style="width:100%;padding:11px 13px;border:.5px solid #85B7EB;border-radius:8px;font-size:13px;margin-bottom:14px" placeholder="https://script.google.com/macros/s/.../exec"><br><button onclick="_save()" style="background:#185FA5;color:#fff;border:none;padding:9px 18px;border-radius:8px;font-size:13px;cursor:pointer">Lưu &amp; tải dashboard</button></div>');
-  var i=ge("cfgUrl"); if(i&&pref) i.value=pref; if(i) i.focus(); }
-function _save(){ var v=ge("cfgUrl").value.trim(); if(!v) return; _setStored(v); loadData(); }
 function loadData(){
-  _boot('<div style="text-align:center;color:#6b6b6b"><div class="bspin"></div><div style="margin-top:12px">Đang tải dữ liệu từ Google Sheet…</div></div>');
-  var base=_resolveUrl(); if(!base) return _showCfg("");
-  var url=base + (base.indexOf("?")>=0?"&":"?") + "api=data&t=" + Date.now();
-  fetch(url).then(function(r){ return r.json(); }).then(function(j){
-    if(!j||!j.ok) throw new Error(j&&j.error?j.error:"Phản hồi không hợp lệ");
-    if(!j.rows||!j.rows.length) throw new Error("Sheet chưa có dữ liệu (bao_cao_ket_qua trống). Sửa 1 phiếu trên Base để webhook ghi dữ liệu.");
+  _boot('<div style="text-align:center;color:#6b6b6b"><div class="bspin"></div><div style="margin-top:12px">Đang tải dữ liệu…</div></div>');
+  var q=new URLSearchParams(location.search).get("src");
+  var base=(q||API_URL||"").trim();
+  if(!base || base.indexOf("PASTE_")===0){ return _boot('<div style="color:#A32D2D">Chưa gắn API_URL trong file.</div>'); }
+  var url=base+(base.indexOf("?")>=0?"&":"?")+"api=data&t="+Date.now();
+  fetch(url).then(function(r){ return r.text(); }).then(function(txt){
+    if(/^\s*GET OK/.test(txt)) throw new Error("API trả về 'GET OK' — Apps Script chưa Deploy phiên bản mới (chưa có ?api=data). Vào Triển khai → Quản lý bản triển khai → ✏️ → Phiên bản: Phiên bản mới → Triển khai.");
+    var j; try{ j=JSON.parse(txt); }catch(e){ throw new Error("Phản hồi không phải JSON: " + String(txt).slice(0,90)); }
+    if(!j.ok) throw new Error(j.error||"Phản hồi không hợp lệ");
+    if(!j.rows||!j.rows.length) throw new Error("Sheet bao_cao_ket_qua chưa có dữ liệu. Sửa 1 phiếu trên Base để webhook ghi.");
     buildModel(j.rows);
     var u=ge("upd"); if(u) u.textContent="Cập nhật: " + new Date(j.updated_at||Date.now()).toLocaleString("vi-VN");
     initDashboard();
     ge("boot").style.display="none";
   }).catch(function(err){
-    _boot('<div style="text-align:center;color:#A32D2D;max-width:640px"><div style="font-weight:600;margin-bottom:8px">Không tải được dữ liệu</div><div style="font-size:13px">'+err.message+'</div><div style="font-size:12.5px;color:#6b6b6b;margin-top:10px">Kiểm tra: URL /exec đúng &amp; đã Deploy phiên bản mới; quyền = Bất kỳ ai; mở thử ...exec?api=data ra JSON.</div><br><button onclick="_showCfg(_resolveUrl())" style="background:#185FA5;color:#fff;border:none;padding:9px 18px;border-radius:8px;cursor:pointer">⚙ Nhập / đổi URL</button></div>');
+    _boot('<div style="text-align:center;color:#A32D2D;max-width:700px"><div style="font-weight:600;margin-bottom:8px;font-size:15px">Không tải được dữ liệu</div><div style="font-size:13px;line-height:1.55">'+err.message+'</div><br><button onclick="loadData()" style="background:#185FA5;color:#fff;border:none;padding:9px 18px;border-radius:8px;cursor:pointer">↻ Thử lại</button></div>');
   });
 }
 loadData();
