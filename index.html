@@ -476,19 +476,27 @@ function initDates(){var o="";DAYS.forEach(function(d){o+='<option>'+d+'</option
 var API_URL = "https://script.google.com/macros/s/AKfycbyRKVRTcyyDdEnsAV8gIkRbQLtRy3yhQ7pGN36vQRxtUFjch9CWR25Ev64qUxDy_w0q5Q/exec";
 var NAME_MAP = {"phuonganh":"Nguyễn Phương Anh","thanhtu":"Lê Thanh Tú","minhduong":"Trần Minh Dương","bichngoc":"Trần Bích Ngọc","BaseSupport":"BaseSupport"};
 
-function _dkey(d){var m=String(d||"").match(/(\d{1,2})\/(\d{1,2})/);return m?(("0"+m[1]).slice(-2)+"/"+("0"+m[2]).slice(-2)):"";}
-function _full(d){var m=String(d||"").match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);return m?new Date(+m[3],+m[2]-1,+m[1]):null;}
+function _full(d){
+  if(d instanceof Date) return d;
+  var s=String(d||"").trim(); if(!s) return null;
+  var m=s.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/); if(m) return new Date(+m[3],+m[2]-1,+m[1]);
+  var t=Date.parse(s); if(!isNaN(t)) return new Date(t);
+  return null;
+}
+function _dkey(d){ var f=_full(d); return f?(("0"+f.getDate()).slice(-2)+"/"+("0"+(f.getMonth()+1)).slice(-2)):""; }
 function _short(w){var h=w.replace(/^@/,"");var nm=NAME_MAP[h];if(nm&&nm.indexOf(" ")>0){var ps=nm.split(" ");return (ps[0][0]+ps[ps.length-1][0]).toUpperCase();}return h.slice(0,2).toUpperCase();}
 
 function buildModel(rows){
   var its = rows.map(function(r){
-    var kh = Number(r["Dây"]) || 0; var rawtt = r["Sản lượng hoàn thành"];
-    var tt = (rawtt===""||rawtt===null||rawtt===undefined) ? null : (Number(rawtt)||0);
-    return { maPhieu:String(r["Mã phiếu"]||"").trim(), maDon:String(r["Mã đơn hàng"]||"").trim()||"(không rõ)",
-      dateF:String(r["Ngày thực hiện"]||"").trim(), endF:String(r["Ngày kết thúc"]||"").trim(),
-      cong:String(r["Độ cong"]||"").trim(), dai:String(r["Độ dài (mm)"]||"").trim(),
-      worker:"@"+String(r["Công nhân phụ trách"]||"").replace(/^@/,"").trim(), kh:kh, tt:tt };
-  }).filter(function(x){ return x.maPhieu; });
+    try{
+      var kh = Number(r["Dây"]) || 0; var rawtt = r["Sản lượng hoàn thành"];
+      var tt = (rawtt===""||rawtt===null||rawtt===undefined) ? null : (Number(rawtt)||0);
+      return { maPhieu:String(r["Mã phiếu"]||"").trim(), maDon:String(r["Mã đơn hàng"]||"").trim()||"(không rõ)",
+        dateF:String(r["Ngày thực hiện"]==null?"":r["Ngày thực hiện"]).trim(), endF:String(r["Ngày kết thúc"]==null?"":r["Ngày kết thúc"]).trim(),
+        cong:String(r["Độ cong"]||"").trim(), dai:String(r["Độ dài (mm)"]||"").trim(),
+        worker:"@"+String(r["Công nhân phụ trách"]||"").replace(/^@/,"").trim(), kh:kh, tt:tt };
+    }catch(e){ return null; }
+  }).filter(function(x){ return x && x.maPhieu; });
 
   LOAI = []; var loaiIdx = {};
   its.forEach(function(i){ var k=i.cong+"|"+i.dai; if(!(k in loaiIdx)){ loaiIdx[k]=LOAI.length; LOAI.push([i.cong,i.dai]); } });
@@ -576,7 +584,8 @@ function initDashboard(){
 function _getStored(){ try{ return localStorage.getItem("sapoche_api_url"); }catch(e){ return null; } }
 function _setStored(v){ try{ localStorage.setItem("sapoche_api_url", v); }catch(e){} }
 function _resolveUrl(){ var q=new URLSearchParams(location.search).get("src"); if(q) return q.trim();
-  var st=_getStored(); if(st) return st.trim(); if(API_URL && API_URL.indexOf("PASTE_")!==0) return API_URL.trim(); return ""; }
+  if(API_URL && API_URL.indexOf("PASTE_")!==0) return API_URL.trim();
+  var st=_getStored(); if(st) return st.trim(); return ""; }
 function _boot(html){ var b=ge("boot"); if(b){ b.style.display="flex"; b.innerHTML=html; } }
 function _showCfg(pref){ _boot('<div style="background:#fff;border:.5px solid #E2E2DC;border-radius:12px;padding:26px 28px;max-width:560px"><div style="font-size:12px;font-weight:600;color:#185FA5;text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">Kết nối Google Sheet</div><div style="font-size:13px;color:#6b6b6b;margin-bottom:14px">Dán URL Apps Script (kết thúc bằng <b>/exec</b>) rồi bấm Tải. Trình duyệt sẽ nhớ cho lần sau.</div><input id="cfgUrl" style="width:100%;padding:11px 13px;border:.5px solid #85B7EB;border-radius:8px;font-size:13px;margin-bottom:14px" placeholder="https://script.google.com/macros/s/.../exec"><br><button onclick="_save()" style="background:#185FA5;color:#fff;border:none;padding:9px 18px;border-radius:8px;font-size:13px;cursor:pointer">Lưu &amp; tải dashboard</button></div>');
   var i=ge("cfgUrl"); if(i&&pref) i.value=pref; if(i) i.focus(); }
